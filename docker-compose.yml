@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: monitor
+      POSTGRES_DB: monitor
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mock-services:
+    build: ./mock_services
+    ports:
+      - "8001:8001"
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      MONITOR_DATABASE_URL: postgresql+asyncpg://monitor:monitor@db:5432/monitor
+      MONITOR_MOCK_SERVICES_URL: http://mock-services:8001
+      MONITOR_CHECK_INTERVAL_SECONDS: 30
+    depends_on:
+      db:
+        condition: service_healthy
+      mock-services:
+        condition: service_started
+
+volumes:
+  pgdata:
