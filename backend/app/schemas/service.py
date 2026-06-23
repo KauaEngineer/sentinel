@@ -24,3 +24,21 @@ class ServiceEventOut(BaseModel):
 
 class ServiceDetail(ServiceStatus):
     recent_events: list[ServiceEventOut]
+
+
+class AlertOut(BaseModel):
+    id: int
+    service_id: int
+    service_name: str
+    level: str
+    message: str
+    created_at: datetime
+    resolved: bool
+
+
+class ServiceAnalysisOut(BaseModel):
+    service_name: str
+    total_events: int
+    uptime_pct: float
+    avg_response_ms: float
+    insights: list[str]

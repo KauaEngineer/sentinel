@@ -4,7 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.service import Service, ServiceEvent
-from app.schemas.service import ServiceStatus, ServiceDetail, ServiceEventOut
+from app.schemas.service import ServiceStatus, ServiceDetail, ServiceEventOut, ServiceAnalysisOut
+from app.services.analysis import analyze_service
 
 router = APIRouter(prefix="/api/services", tags=["services"])
 
@@ -57,3 +58,14 @@ async def get_service_events(
         .limit(min(limit, 500))
     )
     return events_result.scalars().all()
+
+
+@router.get("/{service_name}/analysis", response_model=ServiceAnalysisOut)
+async def get_service_analysis(
+    service_name: str,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await analyze_service(db, service_name)
+    if not result:
+        raise HTTPException(status_code=404, detail="Service not found")
+    return result

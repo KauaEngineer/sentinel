@@ -34,3 +34,18 @@ class ServiceEvent(Base):
     )
 
     service: Mapped["Service"] = relationship(back_populates="events")
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    service_id: Mapped[int] = mapped_column(ForeignKey("services.id"), index=True)
+    level: Mapped[str] = mapped_column(String(20))
+    message: Mapped[str] = mapped_column(Text)
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    service: Mapped["Service"] = relationship()
