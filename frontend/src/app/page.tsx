@@ -1,134 +1,220 @@
-"use client";
+import Link from "next/link";
 
-import { useEffect, useState } from "react";
-import Header from "@/components/Header";
-import ServiceCard from "@/components/ServiceCard";
-import { api, ServiceStatus, Alert } from "@/lib/api";
+const FEATURES = [
+  {
+    title: "Monitoramento em tempo real",
+    desc: "Health checks periodicos em todos os servicos, com status visual (online/offline) atualizado automaticamente a cada ciclo.",
+    icon: "📡",
+  },
+  {
+    title: "Arquitetura event-driven",
+    desc: "Falhas detectadas sao publicadas no Kafka. Consumers independentes processam os eventos — persistencia e alertas desacoplados.",
+    icon: "⚡",
+  },
+  {
+    title: "Analise de padroes",
+    desc: "Deteccao automatica de concentracao horaria de falhas, sequencias consecutivas e degradacao de performance.",
+    icon: "📊",
+  },
+  {
+    title: "Alertas automaticos",
+    desc: "Sistema de alertas que dispara em falhas consecutivas e resolve sozinho quando o servico volta ao normal.",
+    icon: "🔔",
+  },
+];
 
-export default function Dashboard() {
-  const [services, setServices] = useState<ServiceStatus[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
+const STACK = [
+  "FastAPI",
+  "Apache Kafka",
+  "PostgreSQL",
+  "Next.js",
+  "TypeScript",
+  "Tailwind CSS",
+  "Docker",
+  "Kubernetes",
+  "AWS (EKS / RDS / S3)",
+  "Terraform",
+  "GitHub Actions",
+];
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [svcData, alertData] = await Promise.all([
-          api.getServices(),
-          api.getAlerts().catch(() => []),
-        ]);
-        setServices(svcData);
-        setAlerts(alertData);
-      } catch {
-        console.error("Failed to fetch data");
-      } finally {
-        setLoading(false);
-      }
-    }
+const FLOW = [
+  { label: "Mock APIs", sub: "5 servicos simulados" },
+  { label: "Monitor", sub: "FastAPI health checks" },
+  { label: "Kafka", sub: "service-events" },
+  { label: "Consumers", sub: "persister + alerting" },
+  { label: "PostgreSQL", sub: "eventos + alertas" },
+  { label: "Dashboard", sub: "Next.js em tempo real" },
+];
 
-    fetchData();
-    const interval = setInterval(fetchData, 10_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const healthyCount = services.filter((s) => s.is_healthy).length;
-  const unhealthyCount = services.length - healthyCount;
-  const unresolvedAlerts = alerts.filter((a) => !a.resolved);
-
+export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-card border border-card-border rounded-xl p-5">
-            <p className="text-sm text-slate-400 mb-1">Total de Servicos</p>
-            <p className="text-3xl font-bold text-white">{services.length}</p>
+      {/* Nav */}
+      <header className="border-b border-card-border">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
+              <span className="text-white font-bold text-sm">S</span>
+            </div>
+            <span className="text-lg font-bold text-white">Sentinel</span>
           </div>
-          <div className="bg-card border border-card-border rounded-xl p-5">
-            <p className="text-sm text-slate-400 mb-1">Online</p>
-            <p className="text-3xl font-bold text-emerald-400">
-              {healthyCount}
-            </p>
-          </div>
-          <div className="bg-card border border-card-border rounded-xl p-5">
-            <p className="text-sm text-slate-400 mb-1">
-              {unhealthyCount > 0 ? "Offline" : "Alertas"}
-            </p>
-            <p
-              className={`text-3xl font-bold ${
-                unhealthyCount > 0
-                  ? "text-red-400"
-                  : unresolvedAlerts.length > 0
-                    ? "text-yellow-400"
-                    : "text-slate-500"
-              }`}
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/KauaEngineer/sentinel"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-slate-400 hover:text-white transition-colors"
             >
-              {unhealthyCount > 0 ? unhealthyCount : unresolvedAlerts.length}
-            </p>
+              GitHub
+            </a>
+            <Link
+              href="/dashboard"
+              className="text-sm font-medium bg-accent hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+            >
+              Ver Demo
+            </Link>
           </div>
         </div>
+      </header>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
-            <h2 className="text-lg font-semibold text-white mb-4">
-              Servicos Monitorados
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {services.map((svc) => (
-                <ServiceCard key={svc.id} service={svc} />
-              ))}
-            </div>
-          </>
-        )}
+      {/* Hero */}
+      <section className="max-w-6xl mx-auto px-6 py-24 text-center">
+        <div className="inline-flex items-center gap-2 bg-card border border-card-border rounded-full px-4 py-1.5 mb-8">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-xs text-slate-400">
+            Plataforma de monitoramento full-stack
+          </span>
+        </div>
 
-        {unresolvedAlerts.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-lg font-semibold text-white mb-4">
-              Alertas Recentes
-            </h2>
-            <div className="space-y-3">
-              {unresolvedAlerts.slice(0, 5).map((alert) => (
-                <div
-                  key={alert.id}
-                  className={`bg-card border rounded-xl p-4 ${
-                    alert.level === "critical"
-                      ? "border-red-500/50"
-                      : "border-yellow-500/50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                          alert.level === "critical"
-                            ? "bg-red-500/20 text-red-400"
-                            : "bg-yellow-500/20 text-yellow-400"
-                        }`}
-                      >
-                        {alert.level.toUpperCase()}
-                      </span>
-                      <span className="text-sm text-white font-medium">
-                        {alert.service_name}
-                      </span>
-                    </div>
-                    <span className="text-xs text-slate-500">
-                      {new Date(alert.created_at).toLocaleString("pt-BR")}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-400 mt-2">
-                    {alert.message}
-                  </p>
-                </div>
-              ))}
+        <h1 className="text-4xl sm:text-6xl font-bold text-white tracking-tight mb-6">
+          Monitore servicos
+          <br />
+          <span className="text-accent">em tempo real</span>
+        </h1>
+
+        <p className="text-lg text-slate-400 max-w-2xl mx-auto mb-10">
+          Sentinel detecta falhas automaticamente, analisa padroes e dispara
+          alertas — usando FastAPI, Kafka, Kubernetes e AWS. Um projeto que
+          demonstra arquitetura event-driven de ponta a ponta.
+        </p>
+
+        <div className="flex items-center justify-center gap-4">
+          <Link
+            href="/dashboard"
+            className="bg-accent hover:bg-blue-600 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+          >
+            Explorar Dashboard
+          </Link>
+          <a
+            href="https://github.com/KauaEngineer/sentinel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border border-card-border hover:border-slate-500 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+          >
+            Ver Codigo
+          </a>
+        </div>
+
+        <p className="text-xs text-slate-600 mt-6">
+          O dashboard roda com dados simulados nesta demo — o sistema completo
+          sobe localmente com <code className="text-slate-400">docker compose up</code>
+        </p>
+      </section>
+
+      {/* Features */}
+      <section className="max-w-6xl mx-auto px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {FEATURES.map((f) => (
+            <div
+              key={f.title}
+              className="bg-card border border-card-border rounded-xl p-6"
+            >
+              <div className="text-2xl mb-3">{f.icon}</div>
+              <h3 className="text-white font-semibold mb-2">{f.title}</h3>
+              <p className="text-sm text-slate-400 leading-relaxed">{f.desc}</p>
             </div>
-          </div>
-        )}
-      </main>
+          ))}
+        </div>
+      </section>
+
+      {/* Architecture flow */}
+      <section className="max-w-6xl mx-auto px-6 py-16">
+        <h2 className="text-2xl font-bold text-white text-center mb-3">
+          Como funciona
+        </h2>
+        <p className="text-slate-400 text-center mb-12 max-w-xl mx-auto text-sm">
+          O monitor publica eventos no Kafka. Consumers independentes processam
+          esses eventos sem acoplamento — facil de escalar e estender.
+        </p>
+
+        <div className="flex flex-col md:flex-row items-stretch justify-center gap-3">
+          {FLOW.map((step, i) => (
+            <div key={step.label} className="flex items-center gap-3 flex-1">
+              <div className="bg-card border border-card-border rounded-xl p-4 text-center w-full">
+                <p className="text-white font-semibold text-sm">{step.label}</p>
+                <p className="text-xs text-slate-500 mt-1">{step.sub}</p>
+              </div>
+              {i < FLOW.length - 1 && (
+                <span className="text-accent hidden md:block">→</span>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Stack */}
+      <section className="max-w-6xl mx-auto px-6 py-16">
+        <h2 className="text-2xl font-bold text-white text-center mb-10">
+          Stack tecnologica
+        </h2>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {STACK.map((tech) => (
+            <span
+              key={tech}
+              className="bg-card border border-card-border text-slate-300 text-sm px-4 py-2 rounded-lg"
+            >
+              {tech}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="max-w-6xl mx-auto px-6 py-20 text-center">
+        <div className="bg-card border border-card-border rounded-2xl p-12">
+          <h2 className="text-2xl font-bold text-white mb-3">
+            Veja o dashboard em acao
+          </h2>
+          <p className="text-slate-400 mb-8 max-w-md mx-auto text-sm">
+            Status em tempo real, graficos de resposta, historico de eventos e
+            analise de padroes de falha.
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-block bg-accent hover:bg-blue-600 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+          >
+            Abrir Dashboard
+          </Link>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-card-border">
+        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-sm text-slate-500">
+            Desenvolvido por{" "}
+            <span className="text-slate-300 font-medium">Kaua Santos</span>
+          </p>
+          <a
+            href="https://github.com/KauaEngineer/sentinel"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-slate-500 hover:text-white transition-colors"
+          >
+            github.com/KauaEngineer/sentinel
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }

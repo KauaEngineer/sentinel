@@ -65,7 +65,7 @@ export default function ServiceDetailPage() {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <Link
-          href="/"
+          href="/dashboard"
           className="text-sm text-slate-400 hover:text-white transition-colors mb-6 inline-block"
         >
           &larr; Voltar ao dashboard
