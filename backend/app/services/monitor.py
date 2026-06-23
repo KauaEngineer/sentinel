@@ -4,17 +4,16 @@ import time
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.sql import func
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import async_session
-from app.models.service import Service, ServiceEvent
+from app.models.service import Service
+from app.services.kafka_producer import publish_event
 
 logger = logging.getLogger(__name__)
 
 
-async def discover_services(session: AsyncSession) -> list[str]:
+async def discover_services() -> list[str]:
     async with httpx.AsyncClient() as client:
         resp = await client.get(f"{settings.mock_services_url}/services")
         resp.raise_for_status()
@@ -43,10 +42,8 @@ async def check_service(client: httpx.AsyncClient, service_name: str) -> dict:
         }
 
 
-async def run_checks():
+async def ensure_services_registered(service_names: list[str]):
     async with async_session() as session:
-        service_names = await discover_services(session)
-
         for name in service_names:
             svc = (
                 await session.execute(select(Service).where(Service.name == name))
@@ -54,31 +51,26 @@ async def run_checks():
             if not svc:
                 svc = Service(name=name, is_healthy=True)
                 session.add(svc)
-
         await session.commit()
 
-        async with httpx.AsyncClient() as client:
-            for name in service_names:
-                result = await check_service(client, name)
-                svc = (
-                    await session.execute(select(Service).where(Service.name == name))
-                ).scalar_one_or_none()
 
-                svc.is_healthy = result["is_healthy"]
-                svc.last_checked_at = func.now()
+async def run_checks():
+    service_names = await discover_services()
+    await ensure_services_registered(service_names)
 
-                event = ServiceEvent(
-                    service_id=svc.id,
-                    is_healthy=result["is_healthy"],
-                    response_time_ms=result["response_time_ms"],
-                    error_message=result["error_message"],
-                )
-                session.add(event)
+    async with httpx.AsyncClient() as client:
+        for name in service_names:
+            result = await check_service(client, name)
 
-                status = "healthy" if result["is_healthy"] else "UNHEALTHY"
-                logger.info(f"[{name}] {status} ({result['response_time_ms']}ms)")
+            await publish_event(
+                service_name=name,
+                is_healthy=result["is_healthy"],
+                response_time_ms=result["response_time_ms"],
+                error_message=result["error_message"],
+            )
 
-            await session.commit()
+            status = "healthy" if result["is_healthy"] else "UNHEALTHY"
+            logger.info(f"[{name}] {status} ({result['response_time_ms']}ms)")
 
 
 async def monitor_loop():
