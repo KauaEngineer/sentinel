@@ -1,13 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: backend
+  name: backend-api
   namespace: sentinel
 spec:
   replicas: 3
   selector:
     matchLabels:
       app: backend
+      role: api
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -17,6 +18,7 @@ spec:
     metadata:
       labels:
         app: backend
+        role: api
     spec:
       containers:
         - name: backend
@@ -33,10 +35,70 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: DATABASE_URL
+            - name: MONITOR_ENABLE_MONITOR
+              value: "false"
+            - name: MONITOR_ENABLE_CONSUMER
+              value: "false"
           resources:
             requests:
               memory: "128Mi"
               cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-worker
+  namespace: sentinel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+      role: worker
+  template:
+    metadata:
+      labels:
+        app: backend
+        role: worker
+    spec:
+      containers:
+        - name: backend
+          image: sentinel-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          env:
+            - name: MONITOR_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: DATABASE_URL
+            - name: MONITOR_ENABLE_MONITOR
+              value: "true"
+            - name: MONITOR_ENABLE_CONSUMER
+              value: "true"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
             limits:
               memory: "512Mi"
               cpu: "500m"

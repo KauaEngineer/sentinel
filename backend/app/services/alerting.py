@@ -1,45 +1,37 @@
 import json
 import logging
-from collections import defaultdict
 
 from aiokafka import AIOKafkaConsumer
 from sqlalchemy import select
 
 from app.config import settings
 from app.database import async_session
-from app.models.service import Service, Alert
+from app.models.service import Service, ServiceEvent, Alert
 
 logger = logging.getLogger(__name__)
 
 CONSECUTIVE_FAILURE_THRESHOLD = 3
-failure_streaks: defaultdict[str, int] = defaultdict(int)
+
+
+async def _count_trailing_failures(session, service_id: int) -> int:
+    result = await session.execute(
+        select(ServiceEvent)
+        .where(ServiceEvent.service_id == service_id)
+        .order_by(ServiceEvent.checked_at.desc())
+        .limit(CONSECUTIVE_FAILURE_THRESHOLD * 3)
+    )
+    events = result.scalars().all()
+
+    streak = 0
+    for e in events:
+        if not e.is_healthy:
+            streak += 1
+        else:
+            break
+    return streak
 
 
 async def check_and_create_alert(service_name: str, is_healthy: bool):
-    if not is_healthy:
-        failure_streaks[service_name] += 1
-    else:
-        if failure_streaks[service_name] >= CONSECUTIVE_FAILURE_THRESHOLD:
-            await _resolve_alerts(service_name)
-        failure_streaks[service_name] = 0
-        return
-
-    streak = failure_streaks[service_name]
-    if streak == CONSECUTIVE_FAILURE_THRESHOLD:
-        await _create_alert(
-            service_name,
-            level="warning",
-            message=f"{service_name} falhou {streak} vezes consecutivas. Possivel instabilidade.",
-        )
-    elif streak >= CONSECUTIVE_FAILURE_THRESHOLD * 2:
-        await _create_alert(
-            service_name,
-            level="critical",
-            message=f"{service_name} falhou {streak} vezes consecutivas. Servico potencialmente indisponivel.",
-        )
-
-
-async def _create_alert(service_name: str, level: str, message: str):
     async with async_session() as session:
         svc = (
             await session.execute(select(Service).where(Service.name == service_name))
@@ -47,39 +39,45 @@ async def _create_alert(service_name: str, level: str, message: str):
         if not svc:
             return
 
-        alert = Alert(
-            service_id=svc.id,
-            level=level,
-            message=message,
-        )
-        session.add(alert)
-        await session.commit()
-        logger.warning(f"Alert [{level}] created for {service_name}: {message}")
-
-
-async def _resolve_alerts(service_name: str):
-    async with async_session() as session:
-        svc = (
-            await session.execute(select(Service).where(Service.name == service_name))
-        ).scalar_one_or_none()
-        if not svc:
-            return
-
-        unresolved = (
-            await session.execute(
-                select(Alert).where(
-                    Alert.service_id == svc.id,
-                    Alert.resolved == False,
+        if is_healthy:
+            unresolved = (
+                await session.execute(
+                    select(Alert).where(
+                        Alert.service_id == svc.id,
+                        Alert.resolved == False,
+                    )
                 )
+            ).scalars().all()
+
+            for alert in unresolved:
+                alert.resolved = True
+            await session.commit()
+
+            if unresolved:
+                logger.info(f"Resolved {len(unresolved)} alerts for {service_name}")
+            return
+
+        streak = await _count_trailing_failures(session, svc.id)
+
+        if streak == CONSECUTIVE_FAILURE_THRESHOLD:
+            alert = Alert(
+                service_id=svc.id,
+                level="warning",
+                message=f"{service_name} falhou {streak} vezes consecutivas. Possivel instabilidade.",
             )
-        ).scalars().all()
+            session.add(alert)
+            await session.commit()
+            logger.warning(f"Alert [warning] created for {service_name}")
 
-        for alert in unresolved:
-            alert.resolved = True
-        await session.commit()
-
-        if unresolved:
-            logger.info(f"Resolved {len(unresolved)} alerts for {service_name}")
+        elif streak >= CONSECUTIVE_FAILURE_THRESHOLD * 2 and streak % CONSECUTIVE_FAILURE_THRESHOLD == 0:
+            alert = Alert(
+                service_id=svc.id,
+                level="critical",
+                message=f"{service_name} falhou {streak} vezes consecutivas. Servico potencialmente indisponivel.",
+            )
+            session.add(alert)
+            await session.commit()
+            logger.warning(f"Alert [critical] created for {service_name}")
 
 
 async def alerting_consumer_loop():

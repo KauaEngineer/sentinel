@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { isDemoMode } from "@/lib/api";
 
 export default function Header() {
   return (
@@ -9,6 +12,11 @@ export default function Header() {
             <span className="text-white font-bold text-sm">S</span>
           </div>
           <h1 className="text-xl font-bold text-white">Sentinel</h1>
+          {isDemoMode() && (
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400 uppercase tracking-wider">
+              Demo
+            </span>
+          )}
         </Link>
         <nav className="flex items-center gap-6 text-sm text-slate-400">
           <Link href="/" className="hover:text-white transition-colors">

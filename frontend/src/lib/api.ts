@@ -1,4 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { demoData } from "./demo-data";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const IS_DEMO = !API_BASE;
 
 export interface ServiceStatus {
   id: number;
@@ -44,12 +47,33 @@ async function fetchApi<T>(path: string): Promise<T> {
   return res.json();
 }
 
+export function isDemoMode(): boolean {
+  return IS_DEMO;
+}
+
 export const api = {
-  getServices: () => fetchApi<ServiceStatus[]>("/api/services/"),
-  getService: (name: string) => fetchApi<ServiceDetail>(`/api/services/${name}`),
-  getEvents: (name: string, limit = 100) =>
-    fetchApi<ServiceEvent[]>(`/api/services/${name}/events?limit=${limit}`),
-  getAlerts: () => fetchApi<Alert[]>("/api/alerts/"),
-  getAnalysis: (name: string) =>
-    fetchApi<ServiceAnalysis>(`/api/services/${name}/analysis`),
+  getServices: (): Promise<ServiceStatus[]> =>
+    IS_DEMO
+      ? Promise.resolve(demoData.getServices())
+      : fetchApi("/api/services/"),
+
+  getService: (name: string): Promise<ServiceDetail> =>
+    IS_DEMO
+      ? Promise.resolve(demoData.getService(name)!)
+      : fetchApi(`/api/services/${name}`),
+
+  getEvents: (name: string, limit = 100): Promise<ServiceEvent[]> =>
+    IS_DEMO
+      ? Promise.resolve(demoData.getEvents(name).slice(0, limit))
+      : fetchApi(`/api/services/${name}/events?limit=${limit}`),
+
+  getAlerts: (): Promise<Alert[]> =>
+    IS_DEMO
+      ? Promise.resolve(demoData.getAlerts())
+      : fetchApi("/api/alerts/"),
+
+  getAnalysis: (name: string): Promise<ServiceAnalysis | null> =>
+    IS_DEMO
+      ? Promise.resolve(demoData.getAnalysis(name))
+      : fetchApi(`/api/services/${name}/analysis`),
 };

@@ -108,7 +108,7 @@ export default function ServiceDetailPage() {
             {analysis && (
               <div className="mt-6 pt-6 border-t border-card-border">
                 <h4 className="text-sm font-semibold text-slate-400 mb-3">
-                  Analise IA
+                  Analise de Padroes
                 </h4>
                 <div className="space-y-2">
                   {analysis.insights.map((insight, i) => (

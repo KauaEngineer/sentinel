@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     check_interval_seconds: int = 30
     kafka_bootstrap_servers: str = "kafka:29092"
     kafka_topic_events: str = "service-events"
+    enable_monitor: bool = True
+    enable_consumer: bool = True
 
     model_config = {"env_prefix": "MONITOR_"}
 
