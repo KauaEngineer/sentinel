@@ -13,3 +13,8 @@ venv/
 htmlcov/
 node_modules/
 .next/
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!terraform.tfvars.example

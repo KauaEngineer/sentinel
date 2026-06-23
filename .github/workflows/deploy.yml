@@ -1,0 +1,61 @@
+name: Build & Deploy to AWS EKS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: sentinel-eks
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push images
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/sentinel/backend:$IMAGE_TAG -t $ECR_REGISTRY/sentinel/backend:latest ./backend
+          docker build -t $ECR_REGISTRY/sentinel/mock-services:$IMAGE_TAG -t $ECR_REGISTRY/sentinel/mock-services:latest ./mock_services
+          docker build -t $ECR_REGISTRY/sentinel/frontend:$IMAGE_TAG -t $ECR_REGISTRY/sentinel/frontend:latest ./frontend
+
+          docker push $ECR_REGISTRY/sentinel/backend --all-tags
+          docker push $ECR_REGISTRY/sentinel/mock-services --all-tags
+          docker push $ECR_REGISTRY/sentinel/frontend --all-tags
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy to EKS
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd k8s/overlays/aws
+          kustomize edit set image \
+            sentinel-backend=$ECR_REGISTRY/sentinel/backend:$IMAGE_TAG \
+            sentinel-mock-services=$ECR_REGISTRY/sentinel/mock-services:$IMAGE_TAG \
+            sentinel-frontend=$ECR_REGISTRY/sentinel/frontend:$IMAGE_TAG
+          kubectl apply -k .
+          kubectl -n sentinel rollout status deployment/backend --timeout=120s
+          kubectl -n sentinel rollout status deployment/frontend --timeout=120s

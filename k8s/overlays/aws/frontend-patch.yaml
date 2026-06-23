@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: sentinel
+spec:
+  template:
+    spec:
+      containers:
+        - name: frontend
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "https://sentinel-api.yourdomain.com"
